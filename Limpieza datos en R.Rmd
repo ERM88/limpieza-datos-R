@@ -1,0 +1,368 @@
+---
+title: "Limpieza datos en R"
+author: "Enrique Rodríguez Morón"
+date: "24 Noviembre 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+```
+
+# <span style="text-decoration: underline; font-weight: bold;">Messy dataset utilizado</span>
+
+El [dataset utilizado](https://docs.google.com/spreadsheets/d/1CDWBeqpUTBd1TkmDz_M6UGRWdHgU7LOcoiGRTvIttKA/edit#gid=0) es el que se ha dado en el enunciado de la tarea. [Aqui](https://onlinejournalismblog.com/2013/02/21/a-sample-dirty-dataset-for-trying-out-google-refine/) se puede obtener más información sobre este dataset y los problemas de limpiado.
+
+# <span style="text-decoration: underline; font-weight: bold;">Algoritmo</span> {#algoritmo}
+
+(@) [Se instalan los paquetes que se necesitan sino estuvieran ya y se importan](#paso1)
+(@) [Se crean las funciones que se utilizarán para limpiar el dataset](#paso2)
+(@) [Se declaran las variables para la creación de los directorios y se crean](#paso3)
+(@) [Se descarga el fichero y se guarda en el directorio creado](#paso4)
+(@) [Se cambia el nombre a las columnas](#paso5)
+(@) [Se comprueba que no hay NA en el año](#paso6)
+(@) [Se limpia la columna area](#paso7)
+(@) [Se limpia las columnas street y street2](#paso8)
+(@) [Se comprueba que street y street2 tienen los mismos valores y se elimina la segunda](#paso9)
+(@) [Se llama a la API de Goggle para obtener la dirección correcta](#paso10)
+(@) [Se limpia la columna html](#paso11)
+(@) [Los datos limpios se guardan en el directorio creado al principio](#paso12)
+
+###  1. Instalar e importar librerías {#paso1}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+```{r librerias, message=FALSE}
+if (! "xlsx" %in% installed.packages()) {
+  install.packages("xlsx", dependencies=TRUE)
+}
+if (! "gsheet" %in% installed.packages()) {
+  install.packages("gsheet", dependencies=TRUE)
+}
+if (! "stringr" %in% installed.packages()) {
+  install.packages("stringr", dependencies=TRUE)
+}
+if (! "XML" %in% installed.packages()) {
+  install.packages("XML", dependencies=TRUE)
+}
+if (! "dplyr" %in% installed.packages()) {
+  install.packages("dplyr", dependencies=TRUE)
+}
+if (! "RCurl" %in% installed.packages()) {
+  install.packages("RCurl", dependencies=TRUE)
+}
+if (! "RJSONIO" %in% installed.packages()) {
+  install.packages("RJSONIO", dependencies=TRUE)
+}
+if (! "plyr" %in% installed.packages()) {
+  install.packages("plyr", dependencies=TRUE)
+}
+if (! "knitr" %in% installed.packages()) {
+  install.packages("knitr", dependencies=TRUE)
+}
+
+library(xlsx)
+library(gsheet)
+library(stringr)
+library(XML)
+library(dplyr)
+library(RCurl)
+library(RJSONIO)
+library(plyr)
+library(knitr)
+
+rm(list = ls())
+```
+
+### 2. Crear las funciones que se utilizaran para la limpieza {#paso2}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+La primera función limpia una cadena de caracteres, esto es: cambia los caracteres no ASCII por espacios, después elimina todos los espacios al principio y al final, se reduce a 1 solo espacio todos los espacios que haya consecutivos y, por último, se transforma en minúsculas.
+
+Las demás funciones son utilizadas por la primera para llevar a cabo la limpieza.
+
+```{r funciones1, collapse=TRUE}
+CleanNoAsciiAndRemoveMoreThanOneSpace <- function(str) {
+  # Función que cambia los caracteres no ASCII por espacios. Después elimina todos los espacios del principio y final,
+  # se reduce a 1 solo espacio todos los espacios consecutivos y se ponen los valores en minúscula
+  #
+  # Args:
+  #   str: String que se quiere limpiar
+  #
+  # Returns:
+  #   El string pasado por parámetro limpiado, esto es: los caracteres no ASCII son cambiados por espacios
+  
+  if (HasNoAscii(str)) {
+    str <- ReplaceNoAsciiToSpace(str)
+  }
+  str <- tolower(TrimAndRemoveMoreThanOneSpace(str))
+}
+
+HasNoAscii <- function(str) {
+  # Función que devuelve true si la cadena de caracteres contiene caracteres no ASCII. False en caso contrario
+  #
+  # Args:
+  #   str: String del que se quiere saber si tiene caracteres no ASCII
+  #
+  # Returns:
+  #   TRUE si contiene caracteres no ASCII; FALSE en caso contrario
+  
+  any(grepl("NOT_ASCII", iconv(str, "latin1", "ASCII", sub="NOT_ASCII")))
+}
+
+ReplaceNoAsciiToSpace <- function(str) {
+  # Función que reemplaza todos los caracteres no ASCII por espacios
+  #
+  # Args:
+  #   str: String del que se quiere reemplazar los caracteres no ASCII por espacios
+  #
+  # Returns:
+  #   El string pasado por parámetro con todos los caracteres no ASCII cambiados por espacios
+  
+  iconv(str, "latin1", "ASCII", sub=" ")
+}
+
+TrimAndRemoveMoreThanOneSpace <- function(str) {
+  # Función que elimina todos los espacios al principio y al final y, además, si hay más de 1 espacio consecutivo 
+  # lo cambia por 1 solo
+  #
+  # Args:
+  #   str: String del que se quiere eliminar los espacios del principio y del final y los consecutivos
+  #
+  # Returns:
+  #   El string pasado por parámetro con los espacios del principio y del final eliminados y, si hubiese tenido 
+  #   varios espacios consecutivos, se sustituyen por uno solo
+  
+  gsub("\\s+", " ", str_trim(str))
+}
+```
+
+Esta función parsea una entrada HTLM devolviendo el contenido. Por ejemplo si se le pasa como parametro &lt;, < sera devuelto. 
+
+```{r funciones2}
+UnescapeHtml <- function(html) {
+  # Función que parsea una entrada HTML y devuelve el contenido. Por ejemplo, si se llama
+  # a la funcion &amp;, & sera retornado
+  #
+  # Args:
+  #   html: String con el texto HTML que se quiere parsear
+  #
+  # Returns:
+  #   El string pasado por parámetro con el contenido en formato texto, no html
+  
+  xml2::xml_text(xml2::read_html(paste0("<x>", html, "</x>")))
+}
+```
+
+Estas funciones se utilizarán para llamar a la API de Google con una dirección que puede ser errónea.
+
+```{r funciones3}
+Url <- function (address, return.call = "json", sensor = "false") {
+  root <- "http://maps.google.com/maps/api/geocode/"
+  u <- paste(root, return.call, "?address=", address, "&sensor=", sensor, sep = "")
+  return(URLencode(u))
+}
+
+# Esta función retorna NA si no se ha encontrado ningun resultado y un vector con la latitud, longitud, tipo de localizacion, nombre de la calle, y toda la direccion formateada
+GeoCode <- function (address, verbose=FALSE) {
+  if (verbose) {
+    cat(address,"\n")
+  }
+  u <- Url(address)
+  doc <- getURL(u)
+  x <- fromJSON(doc,simplify = FALSE)
+  if(x$status=="OK") {
+    lat <- x$results[[1]]$geometry$location$lat
+    lng <- x$results[[1]]$geometry$location$lng
+    locationType  <- x$results[[1]]$geometry$location_type
+    street  <- x$address_components[[1]]$long_name
+    formattedAddress  <- x$results[[1]]$formatted_address
+    return(c(lat, lng, locationType, street, formattedAddress))
+    Sys.sleep(0.5)
+  } else {
+    return(c(NA, NA, NA, NA, NA))
+  }
+}
+```
+
+
+### 3. Declarar variables para la creación de directorios y la creación de estos {#paso3}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Dentro del directo actual, un nuevo directorio será creado llamado 'modulo3Tareacolaborativa'. Dentro de este, se crearán 2 más: 'original data' que contendrá los ficheros con los datos descargados (messy data), y 'output data' que contendrá los ficheros ya limpios (tidy data).
+
+```{r variablesydirectorios}
+# Nombre del directorio y los subdirectorios donde se guardarán los ficheros originales y los tidy
+mainFolderName <- "modulo3Tareacolaborativa"
+folderOriginalData <- "original data"
+folderOutputData <- "output data"
+# URL para descargar el fichero
+fileURL <- "https://docs.google.com/spreadsheets/d/1CDWBeqpUTBd1TkmDz_M6UGRWdHgU7LOcoiGRTvIttKA/edit#gid=0"
+# Nombre del messydata y del output. Después se unirá a la fecha para obtener el nombre completo
+originalFileNameOriginal <- "messydata"
+outputFileNameOriginal <- "tidydata"
+# Se obtiene la fecha con formato yyyy-mm-dd_hh-mm-ss
+downloadDateString <- format(Sys.time(),"%Y-%m-%d_%H-%M-%S")
+
+# Se crea un directorio para el input y el output
+if (!file.exists(mainFolderName)) { 
+  dir.create(mainFolderName)
+}
+# Se crea el subdirecto donde estarán los datos brutos ("messy dataset")
+if (!file.exists(paste0(mainFolderName, "/", folderOriginalData))) { 
+  dir.create(paste0(mainFolderName, "/", folderOriginalData))
+}
+# Se crea el subdirecto donde estarán los datos limpios ("tidy dataset")
+if (!file.exists(paste0(mainFolderName, "/", folderOutputData))) { 
+  dir.create(paste0(mainFolderName, "/", folderOutputData))
+}
+```
+
+### 4. Se descarga el fichero y se guarda en el directorio creado {#paso4}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Se descarga el fichero utilizando la funcián 'gsheet2tbl' del paquete **'gsheet'** ya que está alojado en Google Docs. Después se guarda en el directorio './modulo3Tareacolaborativa/original data/' con el nombre 'messydata_%Y-%m-%d_%H-%M-%S' donde %Y, %m, %d, %H, %M, %S son el año, mes, día, hora, minuto y segundo actual.
+
+```{r descargayguardado}
+# Se descarga el fichero y se carga. Se guarda como messy data
+filedata <- gsheet2tbl(fileURL)
+folderFileNameInput <- paste0(mainFolderName, "/", folderOriginalData, "/", originalFileNameOriginal, "_", 
+                              downloadDateString, ".xlsx")
+write.xlsx(as.data.frame(filedata), folderFileNameInput, row.names=FALSE, showNA=FALSE)
+```
+
+### 5. Se cambia de nombre de las columnas {#paso5}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Los nombres se asignan directamente a la funcion colnames().
+
+```{r cambionombrecolumnas}
+# Se cambia el nombre de las columnas por comodidad
+colnames(filedata) <- c("year", "area", "street", "street2", "html")
+```
+
+### 6. Se comprueba que no hay NA en el año {#paso6}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Utilizando las funciones any() y is.na() se comprueba que no hay NA en el campo 'year'. También se comprueba que es de tipo integer.
+
+```{r nonaanyo}
+# Se comprueba que no hay huecos en year
+any(is.na(filedata$year))
+class(filedata$year)
+```
+
+### 7. Se limpia la columna area {#paso7}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+El valor del area aparece únicamente una vez. Las filas siguientes a partir de ésta y cuyo valor sea NA, pertecen al mismo area que el anterior que no sea NA. Por tanto se tienen que rellenar estos NA con el valor anterior no NA. Por ejemplo:
+
+```{r echo = FALSE, results = 'asis'}
+kable(data.frame(area = c("Madrid", NA, "Valladolid", NA)), format = "html")
+```
+
+Tendria que trasformase en:
+
+```{r echo = FALSE, results = 'asis'}
+kable(data.frame(area = c("Madrid", "Madrid", "Valladolid", "Valladolid")), format = "html")
+```
+
+Para ello se crea una variable auxiliar que contendrá el valor del actual area. Después se recorre la columna 'area' actualizando el valor de esta variable si el actual valor no es NA, o se asigna el valor de la variable a la fila actual si el valor fuese NA.
+
+```{r limpiezaarea}
+# Se limpia la columna area: si el valor del area actual es NA, se pone el valor anterior que no fuese NA.
+# Si tiene valor, se actualiza el valor del area para lo siguientes valores con NA
+# Se hace una 'superasignacion' para guardar el valor del anterior area no NA
+previousArea <- ""
+filedata$area <- lapply(filedata$area, function(area) {
+  if(is.na(area)){
+    area <- previousArea
+  }else{
+    if(previousArea!=area){
+      previousArea <<- str_trim(area)
+    }
+  }
+} )
+```
+
+### 8. Se limpia las columnas street y street2 {#paso8}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Estas columnas tienen varios problemas:
+
+* Tienen caracteres especiales no ASCII por lo que todos se sustituyen por espacios.
+* Algunos valores tienen espacios al princio y/o al final por lo que eliminan.
+* Hay varios espacios seguidos, por lo que se reducen a un solo espacio.
+* Algunas calles están escritas en minúsculas, otras en mayúsculas, otras solo la primera letra... Por lo que se trasforman todos los valores a minúscula.
+
+Para todo ello, se hace uso de la primera funcion que se ha visto en [paso 2](#paso2)
+
+```{r limpiezastreetstreet2}
+# Se limpia las columnas street y street2: se cambia cualquier caracter no ASCII por un espacio,
+# se eliminan todos los espacios al principio y al final, se sustituyen 2 o más espacios consecutivos por
+# 1 solo, y se pone en minúscula el nombre de las calles
+filedata$street <- lapply(filedata$street, CleanNoAsciiAndRemoveMoreThanOneSpace)
+filedata$street2 <- lapply(filedata$street2, CleanNoAsciiAndRemoveMoreThanOneSpace)
+```
+
+### 9. Se comprueba que street y street2 tienen los mismos valores y se elimina la segunda {#paso9}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Una vez que se ha limpiado las dos columnas, se comprueba si contienen los mismo valores o no. Como se puede observar, 'street' y 'street2' tienen exactamente los mismos valores, por lo que se elimina la segunda.
+
+```{r eliminarstreet2}
+# Una vez limpia las dos columnas street, se comparan para ver si hay diferencias
+filedata$sameStreetStreet2 <- apply(filedata, 1, function(streets) {
+  if(streets[["street"]]==streets[["street2"]]){
+    TRUE
+  }else{
+    FALSE
+  }
+} )
+# Como se puede observar, ambas columnas son identicas por lo que se elimina la columna street2
+sum(! filedata$sameStreetStreet2)
+filedata <- filedata %>% select(- street2, - sameStreetStreet2)
+```
+
+### 10. Se llama a la API de Goggle para obtener la dirección correcta street {#paso10}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Hay algunas direcciones en street que son erróneas. Por ejemplo se tiene 'raod' en vez de 'road'. Para solucionarlo, se llamará al API de Google. Nótese que hay un límite de número de llamadas desde la misma IP sin el key. 
+Si no se obtiene ningún valor en la llamada se mantiene el valor actual. Esta función puede tardar mucho ya que se tiene que llamar a Google y luego se durme medio segundo para no saturarlo y ser baneado.
+
+```{r llamargoogleapistreet}
+filedata$street <- lapply(filedata$street, function (street) {
+  address <- GeoCode(street)
+  if (! is.na(address[4]) ) {
+    street <- tolower(address[4])
+  }
+  street
+} )
+```
+
+### 11. Se limpia la columna html {#paso11}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Esta columna tiene códigos HTML, por lo que se transforman en símbolos utilizando la función que se ha visto en [paso 2](#paso2).
+
+```{r limpiezahtml}
+# Se limpia la columna html: se cambia los códigos html a sus caracteres si no son NA
+filedata$html <- lapply(filedata$html, function(html) {
+  if (! is.na(html)) {
+    html <- UnescapeHtml(html)
+  } else {
+    NA
+  }
+} )
+```
+
+### 12. Los datos limpios se guardan en el directorio creado al principio para tal fin {#paso12}
+###### [Ir al inicio del algoritmo](#algoritmo)
+
+Por último se guarda en el directorio './modulo3Tareacolaborativa/output data/' con el nombre 'tidydata_%Y-%m-%d_%H-%M-%S' donde %Y, %m, %d, %H, %M, %S tienen el mismo valor que el messy data visto en [paso 4](#paso4).
+
+```{r guardadotidy}
+# Se guarda el fichero de salida
+folderFileNameOutput <- paste0(mainFolderName, "/", folderOutputData, "/", outputFileNameOriginal, "_", 
+                               downloadDateString, ".xlsx")
+write.xlsx(as.data.frame(filedata), folderFileNameOutput, row.names=FALSE, showNA=FALSE)
+```
