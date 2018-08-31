@@ -188,11 +188,11 @@ GeoCode <- function (address, verbose=FALSE) {
 ### 3. Declarar variables para la creación de directorios y la creación de estos {#paso3}
 ###### [Ir al inicio del algoritmo](#algoritmo)
 
-Dentro del directo actual, un nuevo directorio será creado llamado 'modulo3Tareacolaborativa'. Dentro de este, se crearán 2 más: 'original data' que contendrá los ficheros con los datos descargados (messy data), y 'output data' que contendrá los ficheros ya limpios (tidy data).
+Dentro del directo actual, un nuevo directorio será creado llamado 'directorioPrincipal'. Dentro de este, se crearán 2 más: 'original data' que contendrá los ficheros con los datos descargados (messy data), y 'output data' que contendrá los ficheros ya limpios (tidy data).
 
 ```{r variablesydirectorios}
 # Nombre del directorio y los subdirectorios donde se guardarán los ficheros originales y los tidy
-mainFolderName <- "modulo3Tareacolaborativa"
+mainFolderName <- "directorioPrincipal"
 folderOriginalData <- "original data"
 folderOutputData <- "output data"
 # URL para descargar el fichero
@@ -220,7 +220,7 @@ if (!file.exists(paste0(mainFolderName, "/", folderOutputData))) {
 ### 4. Se descarga el fichero y se guarda en el directorio creado {#paso4}
 ###### [Ir al inicio del algoritmo](#algoritmo)
 
-Se descarga el fichero utilizando la funcián 'gsheet2tbl' del paquete **'gsheet'** ya que está alojado en Google Docs. Después se guarda en el directorio './modulo3Tareacolaborativa/original data/' con el nombre 'messydata_%Y-%m-%d_%H-%M-%S' donde %Y, %m, %d, %H, %M, %S son el año, mes, día, hora, minuto y segundo actual.
+Se descarga el fichero utilizando la funcián 'gsheet2tbl' del paquete **'gsheet'** ya que está alojado en Google Docs. Después se guarda en el directorio './directorioPrincipal/original data/' con el nombre 'messydata_%Y-%m-%d_%H-%M-%S' donde %Y, %m, %d, %H, %M, %S son el año, mes, día, hora, minuto y segundo actual.
 
 ```{r descargayguardado}
 # Se descarga el fichero y se carga. Se guarda como messy data
@@ -358,7 +358,7 @@ filedata$html <- lapply(filedata$html, function(html) {
 ### 12. Los datos limpios se guardan en el directorio creado al principio para tal fin {#paso12}
 ###### [Ir al inicio del algoritmo](#algoritmo)
 
-Por último se guarda en el directorio './modulo3Tareacolaborativa/output data/' con el nombre 'tidydata_%Y-%m-%d_%H-%M-%S' donde %Y, %m, %d, %H, %M, %S tienen el mismo valor que el messy data visto en [paso 4](#paso4).
+Por último se guarda en el directorio './directorioPrincipal/output data/' con el nombre 'tidydata_%Y-%m-%d_%H-%M-%S' donde %Y, %m, %d, %H, %M, %S tienen el mismo valor que el messy data visto en [paso 4](#paso4).
 
 ```{r guardadotidy}
 # Se guarda el fichero de salida

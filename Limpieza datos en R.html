@@ -294,9 +294,9 @@ GeoCode &lt;- function (address, verbose=FALSE) {
 <h3>3. Declarar variables para la creación de directorios y la creación de estos</h3>
 <div id="ir-al-inicio-del-algoritmo-2" class="section level6">
 <h6><a href="#algoritmo">Ir al inicio del algoritmo</a></h6>
-<p>Dentro del directo actual, un nuevo directorio será creado llamado ‘modulo3Tareacolaborativa’. Dentro de este, se crearán 2 más: ‘original data’ que contendrá los ficheros con los datos descargados (messy data), y ‘output data’ que contendrá los ficheros ya limpios (tidy data).</p>
+<p>Dentro del directo actual, un nuevo directorio será creado llamado ‘directorioPrincipal’. Dentro de este, se crearán 2 más: ‘original data’ que contendrá los ficheros con los datos descargados (messy data), y ‘output data’ que contendrá los ficheros ya limpios (tidy data).</p>
 <pre class="r"><code># Nombre del directorio y los subdirectorios donde se guardarán los ficheros originales y los tidy
-mainFolderName &lt;- &quot;modulo3Tareacolaborativa&quot;
+mainFolderName &lt;- &quot;directorioPrincipal&quot;
 folderOriginalData &lt;- &quot;original data&quot;
 folderOutputData &lt;- &quot;output data&quot;
 # URL para descargar el fichero
@@ -325,7 +325,7 @@ if (!file.exists(paste0(mainFolderName, &quot;/&quot;, folderOutputData))) {
 <h3>4. Se descarga el fichero y se guarda en el directorio creado</h3>
 <div id="ir-al-inicio-del-algoritmo-3" class="section level6">
 <h6><a href="#algoritmo">Ir al inicio del algoritmo</a></h6>
-<p>Se descarga el fichero utilizando la funcián ‘gsheet2tbl’ del paquete <strong>‘gsheet’</strong> ya que está alojado en Google Docs. Después se guarda en el directorio ‘./modulo3Tareacolaborativa/original data/’ con el nombre ‘messydata_%Y-%m-%d_%H-%M-%S’ donde %Y, %m, %d, %H, %M, %S son el año, mes, día, hora, minuto y segundo actual.</p>
+<p>Se descarga el fichero utilizando la funcián ‘gsheet2tbl’ del paquete <strong>‘gsheet’</strong> ya que está alojado en Google Docs. Después se guarda en el directorio ‘./directorioPrincipal/original data/’ con el nombre ‘messydata_%Y-%m-%d_%H-%M-%S’ donde %Y, %m, %d, %H, %M, %S son el año, mes, día, hora, minuto y segundo actual.</p>
 <pre class="r"><code># Se descarga el fichero y se carga. Se guarda como messy data
 filedata &lt;- gsheet2tbl(fileURL)
 folderFileNameInput &lt;- paste0(mainFolderName, &quot;/&quot;, folderOriginalData, &quot;/&quot;, originalFileNameOriginal, &quot;_&quot;, 
@@ -509,7 +509,7 @@ filedata$html &lt;- lapply(filedata$html, function(html) {
 <h3>12. Los datos limpios se guardan en el directorio creado al principio para tal fin</h3>
 <div id="ir-al-inicio-del-algoritmo-11" class="section level6">
 <h6><a href="#algoritmo">Ir al inicio del algoritmo</a></h6>
-<p>Por último se guarda en el directorio ‘./modulo3Tareacolaborativa/output data/’ con el nombre ‘tidydata_%Y-%m-%d_%H-%M-%S’ donde %Y, %m, %d, %H, %M, %S tienen el mismo valor que el messy data visto en <a href="#paso4">paso 4</a>.</p>
+<p>Por último se guarda en el directorio ‘./directorioPrincipal/output data/’ con el nombre ‘tidydata_%Y-%m-%d_%H-%M-%S’ donde %Y, %m, %d, %H, %M, %S tienen el mismo valor que el messy data visto en <a href="#paso4">paso 4</a>.</p>
 <pre class="r"><code># Se guarda el fichero de salida
 folderFileNameOutput &lt;- paste0(mainFolderName, &quot;/&quot;, folderOutputData, &quot;/&quot;, outputFileNameOriginal, &quot;_&quot;, 
                                downloadDateString, &quot;.xlsx&quot;)
